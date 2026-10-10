@@ -37,7 +37,7 @@ def event(ticker,typ,payload):
 
 def load_events(): return records(client,'research_events',1000)
 
-page=st.sidebar.radio('Navigation',['Overview','Live stock screener','Company research agents','Paper portfolio','Historical price backtest','Research journal','Settings & methodology'])
+page=st.sidebar.radio('Navigation',['Overview','Autonomous V2','Intelligence V3','Live stock screener','Company research agents','Paper portfolio','Historical price backtest','Research journal','Settings & methodology'])
 st.sidebar.warning('Educational paper-trading research. No verified alpha or 1000× predictions.')
 
 if page=='Overview':
@@ -51,6 +51,74 @@ if page=='Overview':
     else: st.info('No proposals saved yet. Start with Live stock screener.')
     st.subheader('Project status')
     st.write('Live prices: Yahoo Finance (best effort). Fundamental scores: only when complete. AI agents: real API calls when provided documents. Paper tracking: durable database, no broker. Historical benchmark: price-only, not validated factor alpha.')
+
+elif page=='Autonomous V2':
+    from v2_engine import run_cycle, CAPITAL
+    st.subheader('Autonomous V2 — aggressive fictional portfolio')
+    st.info('Initial capital: $100,000. Paper orders only. A deterministic six-role evidence model is included; LLM agents and ML return prediction are not claimed to be trained or running. This page can preview a cycle. Automated execution requires a scheduled workflow.')
+    st.warning('Data may be incomplete, delayed, or stale. Free Yahoo Finance data is best-effort. Paper execution prices are indicative and cannot be assumed fillable.')
+    count=st.slider('Stocks to scan (slow; provider may rate-limit)',min_value=10,max_value=135,value=40,step=5)
+    with_fund=st.checkbox('Attempt fundamentals (slower, Yahoo best-effort)',value=False)
+    if st.button('Preview research and allocations',type='primary'):
+        with st.spinner('Collecting historical prices and computing agent signals...'):
+            try: st.session_state['v2_preview']=run_cycle(client,trade=False,limit=count,fetch_fundamentals=with_fund)
+            except Exception as exc:st.error(f'Preview failed: {type(exc).__name__}: {exc}')
+    if 'v2_preview' in st.session_state:
+        result=st.session_state['v2_preview']
+        st.metric('Stocks with valid history',result['qualified']);st.metric('Paper NAV',f"${result.get('nav',CAPITAL):,.2f}")
+        if result['targets']:
+            st.dataframe(pd.DataFrame([{k:v for k,v in r.items() if k!='agents'} for r in result['targets']]),use_container_width=True)
+        if result['orders']:st.dataframe(pd.DataFrame(result['orders']),use_container_width=True)
+        if result['errors']:st.expander('Missing data / failures').write(result['errors'])
+        if result['missing_prices']:st.error('Cannot trade: missing current prices '+', '.join(result['missing_prices']))
+    st.caption('Scheduled paper trading is deliberately controlled through GitHub Actions secrets; dashboard preview never places orders.')
+
+elif page=='Intelligence V3':
+    from v3_intelligence import discover_universe, sec_insider_filings, manager_13f_filings, news_headlines, train_price_model
+    st.subheader('Intelligence V3 — machine learning, disclosures, news and stock discovery')
+    st.warning('These are research diagnostics, not verified trading signals. SEC filings can be delayed; news is headline-only; ML uses a price-only baseline with a time-separated holdout.')
+    if st.button('Discover expanded US stock universe'):
+        with st.spinner('Loading current index constituents...'):
+            result=discover_universe()
+        st.session_state['v3_universe']=result
+    if 'v3_universe' in st.session_state:
+        r=st.session_state['v3_universe'];st.write('Symbols discovered:',len(r['symbols']));st.json({'source_counts':r['source_counts'],'errors':r['errors'],'warning':r['warning']});st.dataframe(pd.DataFrame({'ticker':r['symbols']}),use_container_width=True)
+    st.divider()
+    tick=st.text_input('Company ticker for news and SEC insider filing metadata','NVDA').strip().upper()
+    c1,c2=st.columns(2)
+    if c1.button('Read recent news headlines'):
+        try:st.session_state['v3_news']=news_headlines(tick)
+        except Exception as exc:st.error('News unavailable: '+str(exc))
+    if c2.button('Find SEC Form 4 filings'):
+        try:st.session_state['v3_sec']=sec_insider_filings(tick)
+        except Exception as exc:st.error('SEC unavailable: '+str(exc))
+    if 'v3_news' in st.session_state:st.json(st.session_state['v3_news'])
+    if 'v3_sec' in st.session_state:st.json(st.session_state['v3_sec'])
+    manager=st.text_input('Optional institutional manager CIK for 13F filing metadata','')
+    if st.button('Find 13F filings') and manager.strip():
+        try:st.json(manager_13f_filings(manager))
+        except Exception as exc:st.error('13F unavailable: '+str(exc))
+    st.divider()
+    st.subheader('Train and evaluate an exploratory ML return model')
+    st.caption('Uses 5 years of adjusted closing prices for up to 20 chosen stocks, a 21-trading-day target, and chronological holdout evaluation. Training may take several minutes.')
+    symbols=st.text_input('Training tickers (comma-separated)',value=','.join(UNIVERSE[:12]))
+    if st.button('Train ML and inspect out-of-sample error'):
+        tickers=list(dict.fromkeys(x.strip().upper() for x in symbols.split(',') if x.strip()))[:20]
+        with st.spinner('Downloading price histories and training ridge model...'):
+            histories={}
+            for sym in tickers:
+                try:
+                    h=price_history(sym,'5y')
+                    if len(h)>300:histories[sym]=h
+                except Exception:pass
+            result=train_price_model(histories,min_training=100)
+        st.session_state['v3_ml']=result
+    if 'v3_ml' in st.session_state:
+        result=st.session_state['v3_ml']
+        st.json({k:v for k,v in result.items() if k!='predicted_21d_returns'})
+        if result.get('predicted_21d_returns'):
+            st.dataframe(pd.DataFrame([{'ticker':k,'estimated_21d_return':v} for k,v in result['predicted_21d_returns'].items()]).sort_values('estimated_21d_return',ascending=False),use_container_width=True)
+    st.info('V3 intelligence is diagnostic only. Automatic V2 paper trading continues to use its original deterministic rules; unvalidated ML/news signals cannot silently change allocations.')
 
 elif page=='Live stock screener':
     st.subheader('Screen real companies')
@@ -70,6 +138,10 @@ elif page=='Live stock screener':
         else:
             ranked=rank_stocks(df)
             st.metric('Fetched company snapshots',len(df));st.metric('Complete nine-factor scores',len(ranked))
+            st.caption('Metrics available counts 0–9. Missing fields remain missing; no zero-fill. Latest statements are NOT historically point-in-time.')
+            if 'metrics_available' in df.columns:
+                st.bar_chart(df.set_index('ticker')['metrics_available'])
+                st.dataframe(df[['ticker','metrics_available','missing_metrics']],use_container_width=True)
             st.dataframe(df,use_container_width=True)
             if not ranked.empty:
                 st.subheader('Quant rankings (exploratory)')
@@ -79,7 +151,7 @@ elif page=='Live stock screener':
                     r=ranked.loc[ranked.ticker==chosen].iloc[0]
                     event(chosen,'proposal',{'score':round(float(r.score),2),'price_at_proposal':float(r.price),'asof':r.asof,'bucket':r.bucket,'note':'Unvalidated nine-factor rank; not a buy signal'})
                     st.success('Saved with timestamp. No fictional shares purchased.')
-            else: st.info('No companies have all nine metrics. This is expected with free Yahoo data. Use the raw table for research; do not substitute made-up values.')
+            else: st.info('No complete nine-factor scores yet. Review the missing-metrics table above. Free Yahoo data may not support all required fields; do not invent values or trade based on partial scores.')
             st.download_button('Download snapshots CSV',df.to_csv(index=False),'company_snapshots.csv')
         if st.session_state.get('screen_errors'): st.expander('Fetch issues').write(st.session_state['screen_errors'])
 
@@ -103,8 +175,9 @@ elif page=='Company research agents':
 
 elif page=='Paper portfolio':
     st.subheader('Fictional-money ledger')
-    st.info('Trades are entered manually and timestamped in Supabase. The portfolio does not execute trades automatically. Market prices update when this page is visited.')
-    initial=st.number_input('Initial fictional cash (USD)',min_value=100.,value=10000.,step=1000.)
+    st.info('Manual and scheduled automatic FICTIONAL trades are recorded in Supabase. No brokerage access. Prices update when this page is visited.')
+    initial=100000.0
+    st.caption('Starting fictional capital is fixed at $100,000 for ledger consistency.')
     ev=load_events(); trades=sorted([x for x in ev if x['event_type']=='paper_trade'],key=lambda x:x['created_at'])
     holdings={}; cash=initial
     for t in trades:

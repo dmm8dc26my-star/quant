@@ -7,3 +7,5 @@ requests>=2.31,<3
 openai>=1.50,<3
 supabase>=2.7,<3
 pytest>=8,<10
+scikit-learn>=1.5,<2
+lxml>=5,<7

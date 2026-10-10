@@ -1,0 +1,27 @@
+name: Daily fictional portfolio research
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 22 * * 1-5'
+permissions:
+  contents: read
+concurrency:
+  group: daily-paper-portfolio
+  cancel-in-progress: false
+jobs:
+  paper-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      ENABLE_AUTOMATED_PAPER_TRADES: 'false'  # V4 safety: legacy 135-name trader disabled pending integration
+      V2_UNIVERSE_LIMIT: '80'
+      V2_FETCH_FUNDAMENTALS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python run_daily.py

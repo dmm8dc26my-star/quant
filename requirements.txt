@@ -1,0 +1,9 @@
+streamlit>=1.38,<2
+pandas>=2.2,<3
+numpy>=1.26,<3
+plotly>=5.20,<7
+yfinance>=0.2.55,<2
+requests>=2.31,<3
+openai>=1.50,<3
+supabase>=2.7,<3
+pytest>=8,<10

@@ -1,0 +1,5 @@
+Set secrets in Streamlit Cloud settings, never in GitHub:
+OPENAI_API_KEY="..."
+SUPABASE_URL="https://YOURPROJECT.supabase.co"
+SUPABASE_KEY="YOUR_SERVICE_ROLE_KEY"
+APP_PASSWORD="long random password"

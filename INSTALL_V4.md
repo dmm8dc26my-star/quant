@@ -1,0 +1,14 @@
+# Quant Research Lab V4 — browser-only setup
+
+**What changes:** durable US-listed symbol universe (capacity 10,000), rotating research batches, Supabase cached quantitative scores, cross-batch ranking, new **Universe V4** dashboard page, scheduled weekday scanning. The old automatic V2 trading workflow is forced to preview-only for safety; **V4 does not automatically trade the broader universe yet**.
+
+1. Download and extract the V4 ZIP. Upload/replace files at the root of https://github.com/dmm8dc26my-star/quant. Include hidden `.github/workflows/universe_v4.yml` (if GitHub upload hides folders, choose Add file → Create new file, name it `.github/workflows/universe_v4.yml`, paste its contents, and commit).
+2. In Supabase → SQL Editor → New query, paste **schema_v4.sql**, click Run. It creates `stock_universe` and `stock_scores` without deleting existing data.
+3. In Streamlit, open https://quant-research-labb.streamlit.app/ → **Universe V4** → **Refresh listed symbols now**. This populates the universe from US exchange symbol directories. Free sources may fail; if so the app displays errors. The 10,000 number is capacity, not guaranteed active equity count.
+4. In GitHub → Settings → Secrets and variables → Actions, confirm repository **secrets** `SUPABASE_URL` and `SUPABASE_KEY` exist (copy from your Streamlit secrets; never commit them). No extra API key is needed for the symbol feeds.
+5. In GitHub → Actions → **V4 rotating stock universe research** → Run workflow. Look for green completion and check Universe V4 counts. It scans 60 least-recently-attempted tickers per run, five scheduled weekday runs (300 attempts/day). 10,000 symbols need ~34 weekdays for one full pass at that cadence, ignoring holidays/errors. More scans may cause rate limits.
+6. The page begins showing combined top candidates after at least 200 successful, recent (21-day) scores. At the default 300 attempts/day and 21-day freshness, 10,000 cannot all be fresh simultaneously; increase capacity/provider and compute budgets to cover more. This design rotates continuously and avoids treating the first symbols as the whole universe.
+
+**Important limitations:** US listings only, not global; symbol directory can include non-common instruments and unsupported Yahoo symbols despite filtering; some symbols have insufficient price history; no market-cap favoritism is coded, but the model can still favor momentum-heavy large companies. Scores exclude fundamentals by default. No real-time or 24/7 data. V4 does not connect ML/news/filings to stock selection, and it does not execute paper orders from the broad universe. Do not turn on the old workflow to assume that it trades V4 candidates.
+
+**Safety:** existing `research_events` and portfolio are preserved. The existing V2 workflow is disabled from executing new paper trades. Change your Streamlit dashboard password if it has ever been visible in screenshots.

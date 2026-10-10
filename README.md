@@ -1,1 +1,3 @@
-Quant Research Lab V3: existing V2 paper-trading infrastructure plus optional ML, SEC disclosure metadata, news headline diagnostics and US index discovery. See INSTALL_V3.md.
+# Quant Research Lab V4
+
+Start with [INSTALL_V4.md](INSTALL_V4.md). Existing V3 intelligence and V2 preview remain available.
